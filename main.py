@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import datetime
 from matplotlib import colors
 from matplotlib.ticker import PercentFormatter
 import numpy as np
@@ -16,25 +17,29 @@ from datetime import datetime
 import time
 import os
 
+number_of_paths = 2
+mptcp = 1
+
+transfer_size = 100
+
 # ------ Test run settings ----
 
 diagram_name_comment = "250_Mbps_5_ms_and_5_Mpbs_50_ms_and_100_Mb_transfer"
-#diagram_name_comment = "250_Mbps_5_ms_and_100_Mb_transfer"
 
 config = {}
 
 config["run_count"] = 0
 config["total_number_of_runs"] = 0
 
-config["number_of_paths"] = 1
+config["number_of_paths"] = 2
 config["mptcp_is_enabled"] = True
 
-config["bytes_to_transfer"] = 0.2 * 1000 ** 3
+config["bytes_to_transfer"] = (transfer_size / 1000) * 1000 ** 3
 
 config["number_of_samples_per_data_point"] = 50
 
 config["client_path_a"] = {}
-config["client_path_a"]["bandwidth"] = 250
+config["client_path_a"]["bandwidth"] = 100
 config["client_path_a"]["delay"] = 5
 config["client_path_a"]["packet_loss"] = 0
 config["client_path_a"]["queue_size"] = 10
@@ -53,14 +58,113 @@ config["server_path"]["queue_size"] = 10
 
 data = []
 
+def sample_mean_from_config(samples):
+
+    times = []
+
+    for i in range(samples):
+
+        net, h1, h2 = initMininet()
+
+        run_cmd(net, "h2 python3 server.py &")
+
+        time.sleep(0.3)
+
+        res = run_cmd(net, "h1 python3 client.py " + str(int(config["bytes_to_transfer"])))
+        data_value = float(res.split("Total time: ")[-1].split(" ")[0])
+
+        net.stop()
+
+        times.append(data_value)
+
+    print(times)
+
+    #mean = np.median(times)
+    mean = sum(times)
+
+    return mean 
+
+def sample_tcp(config, samples):
+
+    number_of_paths = 1
+    mptcp = 0
+
+    mean_tcp = sample_mean_from_config(samples)
+    print("Sum tcp:", mean_tcp)
+
+    return mean_tcp
+
+def sample_mptcp(config, samples):
+
+    number_of_paths = 2
+    mptcp = 1
+
+    mean_mptcp = sample_mean_from_config(samples)
+    print("Sum mptcp:", mean_mptcp)
+
+    return mean_mptcp
+
 def run_2d_hist():
 
-    H = np.array([[1, 1, 1, 1],
-                  [1, 1, 1, 1],
-                  [1, 1, 1, 1],
-                  [1, 1, 1, 1.2]])  
+    transfer_size = 100
+    sample_size = 50
 
-    plt.imshow(H)
+    mean_tcp = sample_tcp(config, sample_size)
+
+    H = np.array([[1, 1, 1, 1, 1],
+                  [1, 1, 1, 1, 1],
+                  [1, 1, 1, 1, 1],
+                  [1, 1, 1, 1, 1],
+                  [1, 1, 1, 1, 1]])  
+
+    data_samples = []
+
+    bandwidth_range = range(5, 100, 20)
+    delay_range = range(0, 300, 50)
+
+    c = 0
+    diff_times = []
+    for bandwidth in bandwidth_range:
+
+        delay_list = []
+
+        start_time = time.time()
+
+        for delay in delay_range:
+
+            config["client_path_b"]["bandwidth"] = bandwidth
+            config["client_path_b"]["delay"] = delay
+
+            mean_mptcp = sample_mptcp(config, sample_size)
+
+            procentage_diff = mean_mptcp / mean_tcp
+            delay_list.append(procentage_diff)
+
+            print("Bandwidth:", bandwidth, ", Delay:", delay)
+            print("Procentage difference:", procentage_diff)
+            print()
+
+            c += 1
+
+
+        data_samples.append(delay_list)
+
+        for data_sample in data_samples:
+
+            outStr = ""
+            for point in data_sample:
+                outStr += str(round(point, 5)) + "\t"
+                
+            print(outStr)
+
+        diff_time = time.time() - start_time
+        diff_times.append(diff_time)
+
+        print("Estimated time left:", ((sum(diff_times) / len(diff_times)) * (bandwidth_range * delay_range - c)) / 3600, "hours")
+
+    '''
+    np_list = np.array(data_samples)
+    plt.imshow(np_list)
 
     cdict = {'red':  ((0.0, 0.0, 0.0),   
                       (0.5, 1.0, 1.0),    
@@ -77,7 +181,7 @@ def run_2d_hist():
 
     GnRd = colors.LinearSegmentedColormap('GnRd', cdict)
     fig,ax = plt.subplots(1)
-    p=ax.pcolormesh(H,cmap=GnRd,vmin=-0.5,vmax=1.5)
+    p=ax.pcolormesh(H,cmap=GnRd,vmin=-0.995,vmax=1.005)
     fig.colorbar(p,ax=ax)
 
     now = datetime.now()
@@ -86,6 +190,7 @@ def run_2d_hist():
 
     plt.savefig(diagram_path)
     os.system("feh " + diagram_path+ " &")
+    '''
 
 def main():
 
@@ -231,7 +336,8 @@ def initMininet():
     net = Mininet(link=TCLink)
     key = "net.mptcp.mptcp_enabled"
     #value = 1 if config["mptcp_is_enabled"] else 0
-    value = 1
+    #value = 1
+    value = mptcp
     p = Popen("sysctl -w %s=%s" % (key, value), shell=True, stdout=PIPE, stderr=PIPE)
 
     h1 = net.addHost('h1')
@@ -284,12 +390,19 @@ def initMininet():
     h2.cmd("ip route add default via 10.0.2.1 dev h2-eth0 table 1")
     h2.cmd("ip route add default scope global nexthop via 10.0.2.1 dev h2-eth0")
 
-    if config["number_of_paths"] == 1:
+    if number_of_paths == 1:
         h1.cmd("ip link set h1-eth1 down")
 
     return net, h1, h2
 
+def prevent_screen_from_turning_off():
+    os.system("xset -dpms")
+    os.system("xset s noblank")
+    os.system("xset s off")
+    os.system("xset s off -dpms")
+
 if '__main__' == __name__:
+    prevent_screen_from_turning_off()
     run_2d_hist()
     #main()
 
