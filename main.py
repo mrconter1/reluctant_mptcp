@@ -39,7 +39,7 @@ config["bytes_to_transfer"] = (transfer_size / 1000) * 1000 ** 3
 config["number_of_samples_per_data_point"] = 50
 
 config["client_path_a"] = {}
-config["client_path_a"]["bandwidth"] = 100
+config["client_path_a"]["bandwidth"] = 250
 config["client_path_a"]["delay"] = 5
 config["client_path_a"]["packet_loss"] = 0
 config["client_path_a"]["queue_size"] = 10
@@ -104,6 +104,12 @@ def sample_mptcp(config, samples):
 
     return mean_mptcp
 
+def run_large():
+
+
+
+    return None
+
 def run_2d_hist():
 
     transfer_size = 100
@@ -119,7 +125,7 @@ def run_2d_hist():
 
     data_samples = []
 
-    bandwidth_range = range(5, 100, 20)
+    bandwidth_range = np.arange(0.1, 50, 7)
     delay_range = range(0, 300, 50)
 
     c = 0
@@ -128,9 +134,10 @@ def run_2d_hist():
 
         delay_list = []
 
-        start_time = time.time()
 
         for delay in delay_range:
+
+            start_time = time.time()
 
             config["client_path_b"]["bandwidth"] = bandwidth
             config["client_path_b"]["delay"] = delay
@@ -146,6 +153,11 @@ def run_2d_hist():
 
             c += 1
 
+            diff_time = time.time() - start_time
+            diff_times.append(diff_time)
+
+            print("Estimated time left:", ((sum(diff_times) / len(diff_times)) * (len(bandwidth_range) * len(delay_range) - c)) / 3600, "hours")
+
 
         data_samples.append(delay_list)
 
@@ -157,10 +169,6 @@ def run_2d_hist():
                 
             print(outStr)
 
-        diff_time = time.time() - start_time
-        diff_times.append(diff_time)
-
-        print("Estimated time left:", ((sum(diff_times) / len(diff_times)) * (bandwidth_range * delay_range - c)) / 3600, "hours")
 
     '''
     np_list = np.array(data_samples)
@@ -340,6 +348,10 @@ def initMininet():
     value = mptcp
     p = Popen("sysctl -w %s=%s" % (key, value), shell=True, stdout=PIPE, stderr=PIPE)
 
+    tcp_nms_key = "net.ipv4.tcp_no_metrics_save"
+    tcp_no_metrics_save = 1
+    p = Popen ("sysctl -w %s=%s" % (tcp_nms_key, tcp_no_metrics_save), shell=True, stdout=PIPE, stderr=PIPE)
+
     h1 = net.addHost('h1')
     h2 = net.addHost('h2')
     r1 = net.addHost('r1')
@@ -404,6 +416,7 @@ def prevent_screen_from_turning_off():
 if '__main__' == __name__:
     prevent_screen_from_turning_off()
     run_2d_hist()
+    run_large()
     #main()
 
 
