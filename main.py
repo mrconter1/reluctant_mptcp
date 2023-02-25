@@ -20,7 +20,7 @@ import os
 number_of_paths = 2
 mptcp = 1
 
-transfer_size = 100
+global_transfer_size = 100
 
 # ------ Test run settings ----
 
@@ -34,7 +34,7 @@ config["total_number_of_runs"] = 0
 config["number_of_paths"] = 2
 config["mptcp_is_enabled"] = True
 
-config["bytes_to_transfer"] = (transfer_size / 1000) * 1000 ** 3
+config["bytes_to_transfer"] = (global_transfer_size / 1000) * 1000 ** 3
 
 config["number_of_samples_per_data_point"] = 50
 
@@ -106,6 +106,42 @@ def sample_mptcp(config, samples):
 
 def run_large():
 
+    sample_size = 3
+
+    transfer_sizes = [0.01, 0.1, 1, 10, 100]
+
+    primary_bws = [100, 300, 800]
+    primary_delays = [1, 10, 25]
+
+    secondary_bws = [2, 4, 5, 10, 30, 50, 70, 100, 150, 300, 800]
+    secondary_delays = [1, 10, 25, 50, 100, 300]
+
+    count = 0
+    total = len(transfer_sizes) * len(primary_bws) * len(primary_delays) * len(secondary_bws) * len(secondary_delays)
+
+    for transfer_size in transfer_sizes:
+        for primary_bw in primary_bws:
+            for primary_delay in primary_delays:
+                for secondary_bw in secondary_bws:
+                    for secondary_delay in secondary_delays:
+                        print("Run", count, "out of", total)
+
+                        global_transfer_size = transfer_size
+
+                        config["client_path_a"]["bandwidth"] = primary_bw
+                        config["client_path_a"]["delay"] = primary_delay
+
+                        config["client_path_b"]["bandwidth"] = secondary_bw
+                        config["client_path_b"]["delay"] = secondary_delay
+
+                        mean_tcp = sample_tcp(config, sample_size)
+                        mean_mptcp = sample_mptcp(config, sample_size)
+
+                        procentage_diff = mean_mptcp / mean_tcp
+
+                        print(procentage_diff)
+
+                        count += 1
 
 
     return None
@@ -415,8 +451,8 @@ def prevent_screen_from_turning_off():
 
 if '__main__' == __name__:
     prevent_screen_from_turning_off()
-    run_2d_hist()
     run_large()
+    #run_2d_hist()
     #main()
 
 
