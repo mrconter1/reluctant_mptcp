@@ -104,44 +104,127 @@ def sample_mptcp(config, samples):
 
     return mean_mptcp
 
+def file_write(filename, text):
+    with open(filename, 'a') as f:
+        f.write(text)
+
+def generate_table(data):
+
+    html_filename = 'index.html'
+
+    html = ''
+    html += '<!DOCTYPE html>' + '\n'
+    html += '<html>' + '\n'
+    html += '<head>' + '\n'
+    html += '\t' + '<meta http-equiv="refresh" content="5">' + '\n'
+    html += '</head>' + '\n'
+    html += '<style>' + '\n'
+    html += 'table, th, td {' + '\n'
+    html += '\t' + 'border:1px solid black;' + '\n'
+    html += '}' + '\n'
+    html += '</style>' + '\n'
+    html += '<body>' + '\n'
+    html += '\n'
+    html += '<table style="width:100%">' + '\n'
+    
+    for row in data:
+        html += '\t' + '<tr>' + '\n'
+        for el in row:
+            html += '\t\t' + '<th>' + str(el) + '</th>' + '\n'
+        html += '\t' + '<tr>' + '\n'
+
+    html += '</body>' + '\n'
+    html += '</html>' + '\n'
+
+    try:
+        os.remove(html_filename)
+    except:
+        pass
+
+    file_write(html_filename, html)
+
 def run_large():
 
-    sample_size = 3
+    sample_size = 5
 
     transfer_sizes = [0.01, 0.1, 1, 10, 100]
+    #transfer_sizes = [10, 100]
 
     primary_bws = [100, 300, 800]
+    #primary_bws = [100, 300, 500]
     primary_delays = [1, 10, 25]
 
-    secondary_bws = [2, 4, 5, 10, 30, 50, 70, 100, 150, 300, 800]
+    secondary_bws = [2, 10, 30, 50, 70, 125, 300, 800]
+    #secondary_bws = [2, 10, 30, 50, 70, 125, 300, 500]
     secondary_delays = [1, 10, 25, 50, 100, 300]
+    #secondary_delays = [1, 10, 25]
 
     count = 0
     total = len(transfer_sizes) * len(primary_bws) * len(primary_delays) * len(secondary_bws) * len(secondary_delays)
 
+    try:
+        os.remove("out.csv")
+    except:
+        pass
+
+    data = []
+    data.append([])
+    data.append([])
+
+    for i in range(3):
+        data[0].append('')
+        data[1].append('')
+
+    for secondary_bw in secondary_bws:
+        for secondary_delay in secondary_delays:
+            data[0].append(str(secondary_bw) + ' bw')
+            data[1].append(str(secondary_delay) + ' ms')
+
     for transfer_size in transfer_sizes:
         for primary_bw in primary_bws:
             for primary_delay in primary_delays:
+
+                data.append([])
+
+                global_transfer_size = transfer_size
+
+                config["client_path_a"]["bandwidth"] = primary_bw
+                config["client_path_a"]["delay"] = primary_delay
+
+                mean_tcp = sample_tcp(config, sample_size)
+
+                with open('out.csv', 'a') as f:
+                    f.write(str(global_transfer_size) + ',' + str(primary_bw) + ',' + str(primary_delay) + ',')
+
+                data[-1].append(global_transfer_size)
+                data[-1].append(primary_bw)
+                data[-1].append(primary_delay)
+
                 for secondary_bw in secondary_bws:
                     for secondary_delay in secondary_delays:
+
                         print("Run", count, "out of", total)
-
-                        global_transfer_size = transfer_size
-
-                        config["client_path_a"]["bandwidth"] = primary_bw
-                        config["client_path_a"]["delay"] = primary_delay
 
                         config["client_path_b"]["bandwidth"] = secondary_bw
                         config["client_path_b"]["delay"] = secondary_delay
 
-                        mean_tcp = sample_tcp(config, sample_size)
                         mean_mptcp = sample_mptcp(config, sample_size)
 
-                        procentage_diff = mean_mptcp / mean_tcp
+                        procentage_diff = round(100 * (mean_mptcp / mean_tcp))
+
+                        with open('out.csv', 'a') as f:
+                            f.write(str(procentage_diff) + ",")
 
                         print(procentage_diff)
 
+                        data[-1].append(procentage_diff)
+
+                        generate_table(data)
+
                         count += 1
+
+                with open('out.csv', 'a') as f:
+                    f.write('\n')
 
 
     return None
