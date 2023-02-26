@@ -1,19 +1,16 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import datetime
-from matplotlib import colors
 from matplotlib.ticker import PercentFormatter
-import numpy as np
-import matplotlib.pyplot as plt
-from pathlib import Path
-from mininet.net import Mininet
-from mininet.cli import CLI
 from mininet.link import Link, TCLink,Intf
-from subprocess import Popen, PIPE
-import matplotlib.pyplot as plt
 from mininet.log import setLogLevel
+from subprocess import Popen, PIPE
 from mininet.clean import Cleanup
+from mininet.net import Mininet
 from datetime import datetime
+from mininet.cli import CLI
+from pathlib import Path
+from matplotlib import colors
+
+import matplotlib.pyplot as plt
+import numpy as np
 import time
 import os
 
@@ -58,6 +55,11 @@ config["server_path"]["queue_size"] = 10
 
 data = []
 
+def file_write(filename, text):
+    with open(filename, 'a') as f:
+        f.write(text)
+
+
 def sample_mean_from_config(samples):
 
     times = []
@@ -79,11 +81,11 @@ def sample_mean_from_config(samples):
 
     print(times)
 
-    #mean = np.median(times)
     mean = sum(times)
 
     return mean 
 
+# Samples a config using single path topology and single path TCP
 def sample_tcp(config, samples):
 
     number_of_paths = 1
@@ -94,6 +96,7 @@ def sample_tcp(config, samples):
 
     return mean_tcp
 
+# Samples a config using multi path topology and MPTCP
 def sample_mptcp(config, samples):
 
     number_of_paths = 2
@@ -104,10 +107,7 @@ def sample_mptcp(config, samples):
 
     return mean_mptcp
 
-def file_write(filename, text):
-    with open(filename, 'a') as f:
-        f.write(text)
-
+# This function takes a two dimensional list and generates a html-page with a table for it
 def generate_table(data):
 
     html_filename = 'index.html'
@@ -147,25 +147,26 @@ def run_large():
 
     sample_size = 5
 
+    # ----- Fast experiment -----
     transfer_sizes = [0.01, 0.1, 1, 10, 100]
-    #transfer_sizes = [10, 100]
 
     primary_bws = [100, 300, 800]
-    #primary_bws = [100, 300, 500]
     primary_delays = [1, 10, 25]
 
     secondary_bws = [2, 10, 30, 50, 70, 125, 300, 800]
-    #secondary_bws = [2, 10, 30, 50, 70, 125, 300, 500]
     secondary_delays = [1, 10, 25, 50, 100, 300]
-    #secondary_delays = [1, 10, 25]
+
+    # ----- Real experiment -----
+    transfer_sizes = [0.01, 0.1, 1, 10, 100]
+
+    primary_bws = [100, 300, 800]
+    primary_delays = [1, 10, 25]
+
+    secondary_bws = [2, 10, 30, 50, 70, 125, 300, 800]
+    secondary_delays = [1, 10, 25, 50, 100, 300]
 
     count = 0
     total = len(transfer_sizes) * len(primary_bws) * len(primary_delays) * len(secondary_bws) * len(secondary_delays)
-
-    try:
-        os.remove("out.csv")
-    except:
-        pass
 
     data = []
     data.append([])
@@ -193,9 +194,6 @@ def run_large():
 
                 mean_tcp = sample_tcp(config, sample_size)
 
-                with open('out.csv', 'a') as f:
-                    f.write(str(global_transfer_size) + ',' + str(primary_bw) + ',' + str(primary_delay) + ',')
-
                 data[-1].append(global_transfer_size)
                 data[-1].append(primary_bw)
                 data[-1].append(primary_delay)
@@ -212,9 +210,6 @@ def run_large():
 
                         procentage_diff = round(100 * (mean_mptcp / mean_tcp))
 
-                        with open('out.csv', 'a') as f:
-                            f.write(str(procentage_diff) + ",")
-
                         print(procentage_diff)
 
                         data[-1].append(procentage_diff)
@@ -223,101 +218,7 @@ def run_large():
 
                         count += 1
 
-                with open('out.csv', 'a') as f:
-                    f.write('\n')
-
-
     return None
-
-def run_2d_hist():
-
-    transfer_size = 100
-    sample_size = 50
-
-    mean_tcp = sample_tcp(config, sample_size)
-
-    H = np.array([[1, 1, 1, 1, 1],
-                  [1, 1, 1, 1, 1],
-                  [1, 1, 1, 1, 1],
-                  [1, 1, 1, 1, 1],
-                  [1, 1, 1, 1, 1]])  
-
-    data_samples = []
-
-    bandwidth_range = np.arange(0.1, 50, 7)
-    delay_range = range(0, 300, 50)
-
-    c = 0
-    diff_times = []
-    for bandwidth in bandwidth_range:
-
-        delay_list = []
-
-
-        for delay in delay_range:
-
-            start_time = time.time()
-
-            config["client_path_b"]["bandwidth"] = bandwidth
-            config["client_path_b"]["delay"] = delay
-
-            mean_mptcp = sample_mptcp(config, sample_size)
-
-            procentage_diff = mean_mptcp / mean_tcp
-            delay_list.append(procentage_diff)
-
-            print("Bandwidth:", bandwidth, ", Delay:", delay)
-            print("Procentage difference:", procentage_diff)
-            print()
-
-            c += 1
-
-            diff_time = time.time() - start_time
-            diff_times.append(diff_time)
-
-            print("Estimated time left:", ((sum(diff_times) / len(diff_times)) * (len(bandwidth_range) * len(delay_range) - c)) / 3600, "hours")
-
-
-        data_samples.append(delay_list)
-
-        for data_sample in data_samples:
-
-            outStr = ""
-            for point in data_sample:
-                outStr += str(round(point, 5)) + "\t"
-                
-            print(outStr)
-
-
-    '''
-    np_list = np.array(data_samples)
-    plt.imshow(np_list)
-
-    cdict = {'red':  ((0.0, 0.0, 0.0),   
-                      (0.5, 1.0, 1.0),    
-                      (1.0, 0.8, 0.8)),   
-
-            'green': ((0.0, 0.8, 0.8),    
-                      (0.5, 1.0, 1.0),   
-                      (1.0, 0.0, 0.0)),  
-
-            'blue':  ((0.0, 0.0, 0.0),   
-                      (0.5, 1.0, 1.0),    
-                      (1.0, 0.0, 0.0))   
-           }
-
-    GnRd = colors.LinearSegmentedColormap('GnRd', cdict)
-    fig,ax = plt.subplots(1)
-    p=ax.pcolormesh(H,cmap=GnRd,vmin=-0.995,vmax=1.005)
-    fig.colorbar(p,ax=ax)
-
-    now = datetime.now()
-    date_time = now.strftime("_%m_%d_%Y__%H_%M_%S")
-    diagram_path = diagram_name_comment + '_experiment' + date_time + '.png'
-
-    plt.savefig(diagram_path)
-    os.system("feh " + diagram_path+ " &")
-    '''
 
 def main():
 
@@ -405,6 +306,7 @@ def delete_file(file_path):
     if os.path.exists(file_path):
         os.remove(file_path)
 
+# Hack-ish solution to avoid namespace problems when executing commands in a Mininet node
 def run_cmd(net, cmd_str):
 
     script_name = ".temp.sh"
@@ -462,8 +364,6 @@ def initMininet():
 
     net = Mininet(link=TCLink)
     key = "net.mptcp.mptcp_enabled"
-    #value = 1 if config["mptcp_is_enabled"] else 0
-    #value = 1
     value = mptcp
     p = Popen("sysctl -w %s=%s" % (key, value), shell=True, stdout=PIPE, stderr=PIPE)
 
@@ -535,7 +435,4 @@ def prevent_screen_from_turning_off():
 if '__main__' == __name__:
     prevent_screen_from_turning_off()
     run_large()
-    #run_2d_hist()
-    #main()
-
 
