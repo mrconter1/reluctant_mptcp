@@ -145,7 +145,7 @@ def generate_table(data):
 
 def run_large():
 
-    sample_size = 5
+    sample_size = 10
 
     # ----- Fast experiment -----
     transfer_sizes = [0.01, 0.1, 1, 10, 100]
