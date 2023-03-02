@@ -18,6 +18,8 @@ config = {}
 config["number_of_paths"] = 2
 config["mptcp"] = 1
 
+config["system_variables"] = get_system_variables("tcp")
+
 # Default 1 Mb
 config["bytes_to_transfer"] = 1000 ** 3
 
@@ -42,6 +44,26 @@ config["server_path"]["packet_loss"] = 0
 config["server_path"]["queue_size"] = 10
 
 data = []
+
+def set_system_variables(mode):
+
+    system_variables = {}
+
+    system_variables["net.mptcp.mptcp_scheduler"] = "default"
+    system_variables["net.mptcp.mptcp_path_manager"] = "fullmesh"
+    system_variables["net.mptcp.mptcp_checksum"] = 0
+    system_variables["net.ipv4.tcp_no_metrics_save"] = 1
+
+    if mode == "tcp":
+
+        system_variables["net.mptcp.mptcp_enabled"] = 0
+        system_variables["net.ipv4.tcp_congestion_control"] = "cubic"
+
+    elif mode == "mptcp":
+
+        system_variables["net.mptcp.mptcp_enabled"] = 1
+        system_variables["net.ipv4.tcp_congestion_control"] = "lia"
+
 
 def file_write(filename, text):
     with open(filename, 'a') as f:
@@ -226,13 +248,18 @@ def execute_cmd(net, cmd_str):
 def initMininet():
 
     net = Mininet(link=TCLink)
-    key = "net.mptcp.mptcp_enabled"
-    value = config["mptcp"]
-    p = Popen("sysctl -w %s=%s" % (key, value), shell=True, stdout=PIPE, stderr=PIPE)
 
-    tcp_nms_key = "net.ipv4.tcp_no_metrics_save"
-    tcp_no_metrics_save = 1
-    p = Popen ("sysctl -w %s=%s" % (tcp_nms_key, tcp_no_metrics_save), shell=True, stdout=PIPE, stderr=PIPE)
+    if config["mptcp"] == 0:
+        
+        config["system_variables"] = get_system_variables("tcp")
+
+    elif config["mptcp"] == 1:
+
+        config["system_variables"] = get_system_variables("mptcp")
+
+    # Set all system variables
+    for key, value in config["system_variables"].items():
+        p = Popen("sysctl -w %s=%s" % (key, value), shell=True, stdout=PIPE, stderr=PIPE)
 
     h1 = net.addHost('h1')
     h2 = net.addHost('h2')
