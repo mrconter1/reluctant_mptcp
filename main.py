@@ -1,4 +1,3 @@
-from matplotlib.ticker import PercentFormatter
 from mininet.link import Link, TCLink,Intf
 from mininet.log import setLogLevel
 from subprocess import Popen, PIPE
@@ -7,9 +6,7 @@ from mininet.net import Mininet
 from datetime import datetime
 from mininet.cli import CLI
 from pathlib import Path
-from matplotlib import colors
 
-import matplotlib.pyplot as plt
 import numpy as np
 import time
 import os
@@ -19,9 +16,7 @@ mptcp = 1
 
 global_transfer_size = 100
 
-# ------ Test run settings ----
-
-diagram_name_comment = "250_Mbps_5_ms_and_5_Mpbs_50_ms_and_100_Mb_transfer"
+# ------ Test instance run settings ----
 
 config = {}
 
@@ -59,7 +54,6 @@ def file_write(filename, text):
     with open(filename, 'a') as f:
         f.write(text)
 
-
 def sample_sum_from_config(samples):
 
     times = []
@@ -68,11 +62,11 @@ def sample_sum_from_config(samples):
 
         net, h1, h2 = initMininet()
 
-        run_cmd(net, "h2 python3 server.py &")
+        execute_cmd(net, "h2 python3 server.py &")
 
         time.sleep(0.3)
 
-        res = run_cmd(net, "h1 python3 client.py " + str(int(config["bytes_to_transfer"])))
+        res = execute_cmd(net, "h1 python3 client.py " + str(int(config["bytes_to_transfer"])))
         data_value = float(res.split("Total time: ")[-1].split(" ")[0])
 
         net.stop()
@@ -143,18 +137,9 @@ def generate_table(data):
 
 def run_large():
 
-    sample_size = 10
+    sample_size = 3
 
-    # ----- Fast experiment -----
-    transfer_sizes = [0.01, 0.1, 1, 10, 100]
-
-    primary_bws = [100, 300, 800]
-    primary_delays = [1, 10, 25]
-
-    secondary_bws = [2, 10, 30, 50, 70, 125, 300, 800]
-    secondary_delays = [1, 10, 25, 50, 100, 300]
-
-    # ----- Real experiment -----
+    # ----- Experiment range -----
     transfer_sizes = [0.01, 0.1, 1, 10, 100]
 
     primary_bws = [100, 300, 800]
@@ -218,94 +203,13 @@ def run_large():
 
     return None
 
-def main():
-
-    print()
-    print("---- Starting test bed -----")
-    print()
-
-    diagrams_folder = "diagrams"
-
-    # Create folder for diagrams
-    try:
-        os.mkdir(diagrams_folder)
-    except:
-        pass
-
-    path = ""
-    parameter = ""
-    values = []
-    for key, value in config.items():
-        if type(value) is dict:
-            for sub_key, sub_value in value.items():
-                if type(sub_value) is list:
-                    path = key
-                    parameter = sub_key
-                    range_parameters = config[path][parameter]
-                    values = list(range(range_parameters[0], range_parameters[1], range_parameters[2]))
-                    print('Running multiple configs for config["' + path + '"]["' + parameter + '"] with')
-                    print()
-                    print(values)
-                    print()
-                    print("and with " + str(config["number_of_samples_per_data_point"]) + " samples per data point.")
-                    print()
-
-
-    if path != "" and parameter != "":
-
-        config["total_number_of_runs"] = len(values) * config["number_of_samples_per_data_point"]
-
-        print("Total number of runs to be executed:", config["total_number_of_runs"])
-
-        print()
-        print("----------------------------")
-        print()
-
-        for val in values:
-            config[path][parameter] = val
-            runConfig()
-    else:
-
-        config["total_number_of_runs"] = config["number_of_samples_per_data_point"]
-
-        print("Running config with " + str(config["number_of_samples_per_data_point"]) + " samples per data point.")
-
-        print("Total number of runs to be executed:", config["total_number_of_runs"])
-
-        print()
-        print("----------------------------")
-        print()
-
-        runConfig()
-
-    print()
-    print("Plotting following data:")
-    print(data)
-    print()
-
-    plt.boxplot(data)
-
-    if path != "" and parameter != "":
-        plt.xlabel(parameter + " for " + path + " (sample size: " + str(config["number_of_samples_per_data_point"]) + ")")
-    else:
-        plt.xlabel("(sample size: " + str(config["number_of_samples_per_data_point"]) + ")")
-
-    plt.ylabel("Transfer time (seconds)")
-
-    now = datetime.now()
-    date_time = now.strftime("_%m_%d_%Y__%H_%M_%S")
-
-    diagram_path = diagrams_folder + "/" + diagram_name_comment + '_experiment' + date_time + '.png'
-    plt.savefig(diagram_path)
-    os.system("feh " + diagram_path+ " &")
-
 def delete_file(file_path):
 
     if os.path.exists(file_path):
         os.remove(file_path)
 
 # Hack-ish solution to avoid namespace problems when executing commands in a Mininet node
-def run_cmd(net, cmd_str):
+def execute_cmd(net, cmd_str):
 
     script_name = ".temp.sh"
     output_name = ".temp.out"
@@ -325,38 +229,6 @@ def run_cmd(net, cmd_str):
     delete_file(output_name)
 
     return res
-
-def runConfig():
-
-    data_point = []
-
-    i = 0
-    for i in range(config["number_of_samples_per_data_point"]):
-
-        net, h1, h2 = initMininet()
-
-        print("Run " + str(config["run_count"]  + 1) + " out of " + str(config["total_number_of_runs"]))
-        print()
-
-        run_cmd(net, "h2 python3 server.py &")
-
-        time.sleep(1)
-
-        res = run_cmd(net, "h1 python3 client.py " + str(int(config["bytes_to_transfer"])))
-        data_value = float(res.split("Total time: ")[-1].split(" ")[0])
-
-        print("Total time:", data_value, "seconds")
-
-        print()
-
-        net.stop()
-
-        data_point.append(data_value)
-
-        i += 1
-        config["run_count"] += 1
-
-    data.append(data_point)
 
 def initMininet():
 
