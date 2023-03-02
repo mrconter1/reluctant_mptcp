@@ -11,24 +11,17 @@ import numpy as np
 import time
 import os
 
-number_of_paths = 2
-mptcp = 1
-
-global_transfer_size = 100
-
 # ------ Test instance run settings ----
 
 config = {}
 
-config["run_count"] = 0
-config["total_number_of_runs"] = 0
-
 config["number_of_paths"] = 2
-config["mptcp_is_enabled"] = True
+config["mptcp"] = 1
 
-config["bytes_to_transfer"] = (global_transfer_size / 1000) * 1000 ** 3
+# Default 1 Mb
+config["bytes_to_transfer"] = 1000 ** 3
 
-config["number_of_samples_per_data_point"] = 50
+config["sample_size"] = 2
 
 config["client_path_a"] = {}
 config["client_path_a"]["bandwidth"] = 250
@@ -80,8 +73,8 @@ def sample_sum_from_config(samples):
 # Samples a config using single path topology and single path TCP
 def sample_tcp(config, samples):
 
-    number_of_paths = 1
-    mptcp = 0
+    config["number_of_paths"] = 1
+    config["mptcp"] = 0
 
     sum_tcp = sample_sum_from_config(samples)
     print("Sum tcp:", sum_tcp)
@@ -91,8 +84,8 @@ def sample_tcp(config, samples):
 # Samples a config using multi path topology and MPTCP
 def sample_mptcp(config, samples):
 
-    number_of_paths = 2
-    mptcp = 1
+    config["number_of_paths"] = 2
+    config["mptcp"] = 1
 
     sum_mptcp = sample_sum_from_config(samples)
     print("Sum mptcp:", sum_mptcp)
@@ -137,7 +130,7 @@ def generate_table(data):
 
 def run_large():
 
-    sample_size = 3
+    config["sample_size"] = 10
 
     # ----- Experiment range -----
     transfer_sizes = [0.01, 0.1, 1, 10, 100]
@@ -170,14 +163,14 @@ def run_large():
 
                 data.append([])
 
-                global_transfer_size = transfer_size
+                config["bytes_to_transfer"] = int(transfer_size * 1000 ** 2)
 
                 config["client_path_a"]["bandwidth"] = primary_bw
                 config["client_path_a"]["delay"] = primary_delay
 
-                sum_tcp = sample_tcp(config, sample_size)
+                sum_tcp = sample_tcp(config, config["sample_size"])
 
-                data[-1].append(global_transfer_size)
+                data[-1].append(transfer_size)
                 data[-1].append(primary_bw)
                 data[-1].append(primary_delay)
 
@@ -189,7 +182,7 @@ def run_large():
                         config["client_path_b"]["bandwidth"] = secondary_bw
                         config["client_path_b"]["delay"] = secondary_delay
 
-                        sum_mptcp = sample_mptcp(config, sample_size)
+                        sum_mptcp = sample_mptcp(config, config["sample_size"])
 
                         procentage_diff = round(100 * (sum_mptcp / sum_tcp))
 
@@ -234,7 +227,7 @@ def initMininet():
 
     net = Mininet(link=TCLink)
     key = "net.mptcp.mptcp_enabled"
-    value = mptcp
+    value = config["mptcp"]
     p = Popen("sysctl -w %s=%s" % (key, value), shell=True, stdout=PIPE, stderr=PIPE)
 
     tcp_nms_key = "net.ipv4.tcp_no_metrics_save"
@@ -291,7 +284,7 @@ def initMininet():
     h2.cmd("ip route add default via 10.0.2.1 dev h2-eth0 table 1")
     h2.cmd("ip route add default scope global nexthop via 10.0.2.1 dev h2-eth0")
 
-    if number_of_paths == 1:
+    if config["number_of_paths"] == 1:
         h1.cmd("ip link set h1-eth1 down")
 
     return net, h1, h2
