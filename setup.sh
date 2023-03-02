@@ -17,7 +17,7 @@ fi
 sudo apt-get -y install python3 mininet python3-pip
 
 # Install Python3 dependencies
-sudo pip3 install matplotlib mininet
+sudo pip3 install matplotlib mininet numpy
 
 # Create temp folder
 TEMP_FOLDER="temp"
