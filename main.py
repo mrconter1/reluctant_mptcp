@@ -60,7 +60,7 @@ def file_write(filename, text):
         f.write(text)
 
 
-def sample_mean_from_config(samples):
+def sample_sum_from_config(samples):
 
     times = []
 
@@ -81,9 +81,7 @@ def sample_mean_from_config(samples):
 
     print(times)
 
-    mean = sum(times)
-
-    return mean 
+    return sum(times)
 
 # Samples a config using single path topology and single path TCP
 def sample_tcp(config, samples):
@@ -91,10 +89,10 @@ def sample_tcp(config, samples):
     number_of_paths = 1
     mptcp = 0
 
-    mean_tcp = sample_mean_from_config(samples)
-    print("Sum tcp:", mean_tcp)
+    sum_tcp = sample_sum_from_config(samples)
+    print("Sum tcp:", sum_tcp)
 
-    return mean_tcp
+    return sum_tcp
 
 # Samples a config using multi path topology and MPTCP
 def sample_mptcp(config, samples):
@@ -102,10 +100,10 @@ def sample_mptcp(config, samples):
     number_of_paths = 2
     mptcp = 1
 
-    mean_mptcp = sample_mean_from_config(samples)
-    print("Sum mptcp:", mean_mptcp)
+    sum_mptcp = sample_sum_from_config(samples)
+    print("Sum mptcp:", sum_mptcp)
 
-    return mean_mptcp
+    return sum_mptcp
 
 # This function takes a two dimensional list and generates a html-page with a table for it
 def generate_table(data):
@@ -192,7 +190,7 @@ def run_large():
                 config["client_path_a"]["bandwidth"] = primary_bw
                 config["client_path_a"]["delay"] = primary_delay
 
-                mean_tcp = sample_tcp(config, sample_size)
+                sum_tcp = sample_tcp(config, sample_size)
 
                 data[-1].append(global_transfer_size)
                 data[-1].append(primary_bw)
@@ -206,9 +204,9 @@ def run_large():
                         config["client_path_b"]["bandwidth"] = secondary_bw
                         config["client_path_b"]["delay"] = secondary_delay
 
-                        mean_mptcp = sample_mptcp(config, sample_size)
+                        sum_mptcp = sample_mptcp(config, sample_size)
 
-                        procentage_diff = round(100 * (mean_mptcp / mean_tcp))
+                        procentage_diff = round(100 * (sum_mptcp / sum_tcp))
 
                         print(procentage_diff)
 
