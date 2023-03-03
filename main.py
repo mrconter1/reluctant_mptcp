@@ -18,7 +18,7 @@ config = {}
 config["number_of_paths"] = 2
 config["mptcp"] = 1
 
-config["system_variables"] = get_system_variables("tcp")
+config["system_variables"] = None
 
 # Default 1 Mb
 config["bytes_to_transfer"] = 1000 ** 3
@@ -45,7 +45,7 @@ config["server_path"]["queue_size"] = 10
 
 data = []
 
-def set_system_variables(mode):
+def get_system_variables(mode):
 
     system_variables = {}
 
@@ -63,6 +63,8 @@ def set_system_variables(mode):
 
         system_variables["net.mptcp.mptcp_enabled"] = 1
         system_variables["net.ipv4.tcp_congestion_control"] = "lia"
+
+    return system_variables
 
 
 def file_write(filename, text):
@@ -158,7 +160,7 @@ def run_large():
     transfer_sizes = [0.01, 0.1, 1, 10, 100]
 
     primary_bws = [100, 300, 800]
-    primary_delays = [1, 10, 25]
+    primary_delays = [25]
 
     secondary_bws = [2, 10, 30, 50, 70, 125, 300, 800]
     secondary_delays = [1, 10, 25, 50, 100, 300]
