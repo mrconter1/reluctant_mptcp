@@ -19,6 +19,10 @@ sudo apt-get -y install python3 mininet python3-pip
 # Install Python3 dependencies
 sudo pip3 install matplotlib mininet numpy
 
+# Change max bandwidth for Mininet from 1 Gpbs to 2 Gpbs
+MININET_LINK_PATH=$(python3 -c 'import site; print(site.getsitepackages()[0] + "/mininet/link.py")')
+sudo sed -i "s/bwParamMax = .*/bwParamMax = 2000/g" $MININET_LINK_PATH
+
 # Create temp folder
 TEMP_FOLDER="temp"
 sudo rm -rf $TEMP_FOLDER
