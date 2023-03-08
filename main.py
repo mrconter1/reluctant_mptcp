@@ -81,6 +81,9 @@ def sample_sum_from_config(samples):
 
         execute_cmd(net, "h2 python3 server.py &")
 
+        print("h1 mptcp_enabled: ", execute_cmd(net, "h1 sysctl -a | grep mptcp_enabled"))
+        print("h2 mptcp_enabled: ", execute_cmd(net, "h2 sysctl -a | grep mptcp_enabled"))
+
         time.sleep(0.3)
 
         res = execute_cmd(net, "h1 python3 client.py " + str(int(config["bytes_to_transfer"])))
@@ -101,7 +104,7 @@ def sample_tcp(config, samples):
     config["mptcp"] = 0
 
     sum_tcp = sample_sum_from_config(samples)
-    print("Sum tcp:", sum_tcp)
+    #print("Sum tcp:", sum_tcp)
 
     return sum_tcp
 
@@ -112,7 +115,7 @@ def sample_mptcp(config, samples):
     config["mptcp"] = 1
 
     sum_mptcp = sample_sum_from_config(samples)
-    print("Sum mptcp:", sum_mptcp)
+    #print("Sum mptcp:", sum_mptcp)
 
     return sum_mptcp
 
@@ -154,16 +157,18 @@ def generate_table(data):
 
 def run_large():
 
-    config["sample_size"] = 10
+    config["sample_size"] = 3
 
     # ----- Experiment range -----
-    transfer_sizes = [0.01, 0.1, 1, 10, 100]
+    #transfer_sizes = [0.01, 0.1, 1, 10, 100]
+    transfer_sizes = [10, 100, 100]
 
-    primary_bws = [100, 300, 800]
-    primary_delays = [25]
+    primary_bws = [100]
+    primary_delays = [10]
 
-    secondary_bws = [2, 10, 30, 50, 70, 125, 300, 800]
-    secondary_delays = [1, 10, 25, 50, 100, 300]
+    secondary_bws = [10, 50, 125, 300, 800]
+    #secondary_delays = [1, 10, 25, 50, 100, 300]
+    secondary_delays = [10]
 
     count = 0
     total = len(transfer_sizes) * len(primary_bws) * len(primary_delays) * len(secondary_bws) * len(secondary_delays)
@@ -201,16 +206,47 @@ def run_large():
                 for secondary_bw in secondary_bws:
                     for secondary_delay in secondary_delays:
 
-                        print("Run", count, "out of", total)
-
                         config["client_path_b"]["bandwidth"] = secondary_bw
                         config["client_path_b"]["delay"] = secondary_delay
 
                         sum_mptcp = sample_mptcp(config, config["sample_size"])
 
-                        procentage_diff = round(100 * (sum_mptcp / sum_tcp))
+                        print("-------------------------------")
 
-                        print(procentage_diff)
+                        print("Run", count, "out of", total)
+
+                        print()
+
+                        print("Sample size:\t\t\t\t",        config["sample_size"])
+
+                        print()
+
+                        print("Primary bw:\t\t\t\t",        primary_bw,           "\tMbps")
+                        print("Primary delay:\t\t\t\t",     primary_delay,        "\tms")
+
+                        print("Secondary bw:\t\t\t\t",      secondary_bw,         "\tMbps")
+                        print("Secondary delay:\t\t\t",     secondary_delay,      "\tms")
+
+                        print()
+
+                        total_transfer_size = transfer_size * config["sample_size"]
+                        print("Transfer file size:\t\t\t", round(transfer_size, 2),  "\tMb")
+                        print()
+                        print("Average transfer time\t(TCP):\t\t",   round(sum_tcp / config["sample_size"], 2),              "\tseconds")
+                        tcp_throughput = (total_transfer_size * 8) / sum_tcp
+                        print("Average Throughput\t(TCP):\t\t",          round(tcp_throughput, 2),       "\tMbps")
+
+                        print()
+                        print("Average transfer time\t(MPTCP):\t", round(sum_mptcp / config["sample_size"], 2),            "\tseconds")
+                        mptcp_throughput = (total_transfer_size * 8) / sum_mptcp
+                        print("Average Throughput\t(MPCTCP):\t",      round(mptcp_throughput, 2),     "\tMbps")
+                        print()
+
+                        procentage_diff = round(100 * (mptcp_throughput / tcp_throughput))
+
+                        print("Improvement:\t\t\t\t",           procentage_diff, "\t%")
+
+                        print("-------------------------------")
 
                         data[-1].append(procentage_diff)
 
@@ -251,6 +287,8 @@ def initMininet():
 
     net = Mininet(link=TCLink)
 
+    '''
+
     if config["mptcp"] == 0:
         
         config["system_variables"] = get_system_variables("tcp")
@@ -261,7 +299,25 @@ def initMininet():
 
     # Set all system variables
     for key, value in config["system_variables"].items():
-        p = Popen("sysctl -w %s=%s" % (key, value), shell=True, stdout=PIPE, stderr=PIPE)
+        p = Popen("sudo sysctl -w %s=%s" % (key, value), shell=True, stdout=PIPE, stderr=PIPE)
+
+    p = Popen("sudo sysctl -a | grep mptcp", shell=True, stdout=PIPE, stderr=PIPE)
+    stdout, stderr = p.communicate()
+    print()
+    print("Sysctl:")
+    print(stdout.decode("utf-8"))
+    print()
+    '''
+
+    key = "net.mptcp.mptcp_enabled"
+
+    value = 1
+
+    p = Popen("sysctl -w %s=%s" % (key, value), shell=True, stdout=PIPE, stderr=PIPE)
+
+    stdout, stderr = p.communicate()
+
+    print("stdout=",stdout,"stderr=", stderr)
 
     h1 = net.addHost('h1')
     h2 = net.addHost('h2')
@@ -314,7 +370,13 @@ def initMininet():
     h2.cmd("ip route add default scope global nexthop via 10.0.2.1 dev h2-eth0")
 
     if config["number_of_paths"] == 1:
+        print("Using single path!")
         h1.cmd("ip link set h1-eth1 down")
+    else:
+        print("Using mp path!")
+        h1.cmd("ip link set h1-eth1 up")
+
+    CLI(net)
 
     return net, h1, h2
 
